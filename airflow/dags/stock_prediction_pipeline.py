@@ -157,44 +157,44 @@ def run_predictions(**context):
         logger.error(f"Error running predictions: {str(e)}")
         raise
 
-# Task definitions
-
-with TaskGroup('data_collection', tooltip='Collect data from various sources') as tg_collection:
-    task_fetch_stocks = PythonOperator(
-        task_id='fetch_stock_prices',
-        python_callable=fetch_stock_prices,
+# Task definitions - DAGコンテキスト内に定義
+with dag:
+    with TaskGroup('data_collection', tooltip='Collect data from various sources') as tg_collection:
+        task_fetch_stocks = PythonOperator(
+            task_id='fetch_stock_prices',
+            python_callable=fetch_stock_prices,
+            provide_context=True,
+        )
+        
+        task_fetch_macro = PythonOperator(
+            task_id='fetch_macro_indicators',
+            python_callable=fetch_macro_indicators,
+            provide_context=True,
+        )
+        
+        task_fetch_policy = PythonOperator(
+            task_id='fetch_policy_data',
+            python_callable=fetch_policy_data,
+            provide_context=True,
+        )
+    
+    task_validate = PythonOperator(
+        task_id='validate_and_clean_data',
+        python_callable=validate_and_clean_data,
         provide_context=True,
     )
     
-    task_fetch_macro = PythonOperator(
-        task_id='fetch_macro_indicators',
-        python_callable=fetch_macro_indicators,
+    task_save_db = PythonOperator(
+        task_id='save_to_database',
+        python_callable=save_to_database,
         provide_context=True,
     )
     
-    task_fetch_policy = PythonOperator(
-        task_id='fetch_policy_data',
-        python_callable=fetch_policy_data,
+    task_predict = PythonOperator(
+        task_id='run_predictions',
+        python_callable=run_predictions,
         provide_context=True,
     )
-
-task_validate = PythonOperator(
-    task_id='validate_and_clean_data',
-    python_callable=validate_and_clean_data,
-    provide_context=True,
-)
-
-task_save_db = PythonOperator(
-    task_id='save_to_database',
-    python_callable=save_to_database,
-    provide_context=True,
-)
-
-task_predict = PythonOperator(
-    task_id='run_predictions',
-    python_callable=run_predictions,
-    provide_context=True,
-)
-
-# Task dependencies
-[tg_collection] >> task_validate >> task_save_db >> task_predict
+    
+    # Task dependencies
+    tg_collection >> task_validate >> task_save_db >> task_predict
